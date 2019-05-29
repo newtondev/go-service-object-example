@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"log"
+
+	"github.com/newtondev/service_object/pkg/entities"
 )
 
 // RegistratorWithLog implements Registrator that is instrumented with logging
@@ -22,11 +24,11 @@ func NewRegistratorWithLog(base Registrator, stdout, stderr io.Writer) Registrat
 }
 
 // Register implements Registrator
-func (rl RegistratorWithLog) Register(ctx context.Context, f *Form) (up1 *User, err error) {
+func (rl RegistratorWithLog) Register(ctx context.Context, f *entities.Form) (u *entities.User, err error) {
 	params := []interface{}{"RegistratorWithLog: calling Register with params:", ctx, f}
 	rl.stdlog.Println(params...)
 	defer func() {
-		results := []interface{}{"RegistratorWithLog: Register return results:", up1, err}
+		results := []interface{}{"RegistratorWithLog: Register return results:", u, err}
 		if err != nil {
 			rl.errlog.Println(results...)
 		} else {

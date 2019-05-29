@@ -12,18 +12,11 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/newtondev/service_object/pkg/storage"
+	"github.com/newtondev/service_object/pkg/entities"
+	"github.com/newtondev/service_object/pkg/constants"
+	svcerrors "github.com/newtondev/service_object/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
-)
-
-const (
-	passwordMismatch = "password mismatch"
-	emailExists      = "email exists"
-	validationMsg    = "you have validation errors"
-)
-
-var (
-	// ErrEmailExists returns when given email is present in storage.
-	ErrEmailExists = errors.New("email already exists")
 )
 
 func main() {
@@ -37,7 +30,7 @@ func main() {
 		stdout = os.Stdout
 	}
 
-	r := MemStore{}
+	r := storage.MemStore{}
 	s := NewServer(*addr, stdout, &r)
 	if err := s.ListenAndServe(); err != nil {
 		log.Fatalf("start server: %v", err)
@@ -73,12 +66,12 @@ func NewServer(addr string, stdout io.Writer, r Repository) *http.Server {
 // Repository is a data access layer.
 type Repository interface {
 	Unique(ctx context.Context, email string) error
-	Create(context.Context, *Form) (*User, error)
+	Create(context.Context, *entities.Form) (*entities.User, error)
 }
 
 // Validator validation abstraction.
 type Validator interface {
-	Validate(context.Context, *Form) error
+	Validate(context.Context, *entities.Form) error
 }
 
 // ValidationErrors holds validation errors.
@@ -86,7 +79,7 @@ type ValidationErrors map[string]string
 
 // Error implements error interface
 func (v ValidationErrors) Error() string {
-	return validationMsg
+	return constants.ValidationMsg
 }
 
 // Service holds data required for registration.
@@ -96,7 +89,7 @@ type Service struct {
 }
 
 // Register hold registration domain logic.
-func (s *Service) Register(ctx context.Context, f *Form) (*User, error) {
+func (s *Service) Register(ctx context.Context, f *entities.Form) (*entities.User, error) {
 	if err := s.Validator.Validate(ctx, f); err != nil {
 		return nil, errors.Wrap(err, "validator validate")
 	}
@@ -111,7 +104,7 @@ func (s *Service) Register(ctx context.Context, f *Form) (*User, error) {
 
 // Registrator abstraction for registration service.
 type Registrator interface {
-	Register(context.Context, *Form) (*User, error)
+	Register(context.Context, *entities.Form) (*entities.User, error)
 }
 
 // RegistrationHandler for registration requrests.
@@ -121,7 +114,7 @@ type RegistrationHandler struct {
 
 // ServerHTTP implements http.Handler.
 func (h *RegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var f Form
+	var f entities.Form
 	if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -142,49 +135,6 @@ func (h *RegistrationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(&u)
 }
 
-// Form is a registration request.
-type Form struct {
-	Email                string `json:"email" validate:"required,email"`
-	Password             string `json:"password" validate:"gte=3,lte=16"`
-	PasswordConfirmation string `json:"password_confirmation" validate:"gte=3,lte=16"`
-}
-
-// User represents the database colum.
-type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// MemStore is a memory storage for users.
-type MemStore struct {
-	Users []User
-}
-
-// Unique checks if a email exists in the database.
-func (s *MemStore) Unique(ctx context.Context, email string) error {
-	for _, u := range s.Users {
-		if u.Email == email {
-			return ErrEmailExists
-		}
-	}
-
-	return nil
-}
-
-// Create creates user in the database for a form.
-func (s *MemStore) Create(ctx context.Context, f *Form) (*User, error) {
-	u := User{
-		ID:       len(s.Users) + 1,
-		Password: f.Password,
-		Email:    f.Email,
-	}
-
-	s.Users = append(s.Users, u)
-
-	return &u, nil
-}
-
 // PlayValidator holds registration form validations.
 type PlayValidator struct {
 	Validator *validator.Validate
@@ -192,7 +142,7 @@ type PlayValidator struct {
 }
 
 // Validate implements Validator.
-func (v *PlayValidator) Validate(ctx context.Context, f *Form) error {
+func (v *PlayValidator) Validate(ctx context.Context, f *entities.Form) error {
 	validations := make(ValidationErrors)
 
 	err := v.Validator.Struct(f)
@@ -205,15 +155,15 @@ func (v *PlayValidator) Validate(ctx context.Context, f *Form) error {
 	}
 
 	if f.Password != f.PasswordConfirmation {
-		validations["password"] = passwordMismatch
+		validations["password"] = constants.PasswordMismatch
 	}
 
 	if err := v.Repository.Unique(ctx, f.Email); err != nil {
-		if err != ErrEmailExists {
+		if err != svcerrors.ErrEmailExists {
 			return errors.Wrap(err, "repository unique")
 		}
 
-		validations["email"] = emailExists
+		validations["email"] = constants.EmailExists
 	}
 
 	if len(validations) > 0 {

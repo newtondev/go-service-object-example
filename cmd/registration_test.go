@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/newtondev/service_object/pkg/storage"
+	"github.com/newtondev/service_object/pkg/entities"
 )
 
 func TestRegistration(t *testing.T) {
@@ -71,10 +73,10 @@ func TestRegistration(t *testing.T) {
 	}
 }
 
-func testStorage() *MemStore {
-	repo := MemStore{
-		Users: []User{
-			User{
+func testStorage() *storage.MemStore {
+	repo := storage.MemStore{
+		Users: []entities.User{
+			entities.User{
 				ID:       1,
 				Email:    "exists@domain.zone",
 				Password: "qwerty",

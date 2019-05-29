@@ -1,6 +1,6 @@
 package constants
 
-var (
+const (
 	PasswordMismatch = "password mismatch"
 	EmailExists      = "email exists"
 	ValidationMsg    = "you have validation errors"
